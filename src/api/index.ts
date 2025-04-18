@@ -53,5 +53,10 @@ export const api = {
     return axios.delete(`${BASE_URL}/documents/delete`, {
     data: { name }
     })
+  },
+
+  // 获取文档内容
+  getDocumentContent(docName: string) {
+    return axios.get(`${BASE_URL}/documents/content/${encodeURIComponent(docName)}`)
   }
 }

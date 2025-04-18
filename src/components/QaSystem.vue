@@ -49,7 +49,7 @@
                 <template #dropdown>
                   <el-dropdown-menu>
                     <div v-for="doc in documents" :key="doc" class="config-item">
-                      <el-dropdown-item>
+                      <el-dropdown-item @click="handleViewDocument(doc)">
                         {{ doc }}
                       </el-dropdown-item>
                       <el-button
@@ -105,14 +105,30 @@
           <div class="answer-section">
             <div class="section-title">参考来源：</div>
             <div class="section-content">
-              <div v-for="(ref, index) in answer.references" :key="index">
-                {{ ref }}
+              <div v-for="(ref, index) in answer.references" :key="index" class="reference-item">
+                <el-button 
+                  link 
+                  type="primary" 
+                  @click="handleViewDocument(ref)"
+                >
+                  {{ ref }}
+                </el-button>
               </div>
             </div>
           </div>
         </div>
       </el-card>
     </div>
+
+    <!-- 添加文档内容对话框 -->
+    <el-dialog
+      v-model="showDocumentDialog"
+      :title="currentDocument"
+      width="60%"
+      :close-on-click-modal="false"
+    >
+      <pre class="document-content">{{ documentContent }}</pre>
+    </el-dialog>
   </template>
   
   <script setup lang="ts">
@@ -131,6 +147,11 @@
   const configs = ref<{ filename: string }[]>([])
   const currentConfig = ref('')
   const documents = ref<string[]>([])
+  
+  // 添加文档内容相关的响应式变量
+  const showDocumentDialog = ref(false)
+  const documentContent = ref('')
+  const currentDocument = ref('')
   
   // 加载配置列表
   const loadConfigs = async () => {
@@ -337,6 +358,22 @@
     }
   }
   
+  // 添加查看文档的方法
+  const handleViewDocument = async (docName: string) => {
+    try {
+      const response = await api.getDocumentContent(docName)
+      if (response.data.success) {
+        documentContent.value = response.data.data.content
+        currentDocument.value = docName
+        showDocumentDialog.value = true
+      } else {
+        ElMessage.error(response.data.message)
+      }
+    } catch (error) {
+      ElMessage.error('获取文档内容失败')
+    }
+  }
+  
   onMounted(() => {
     loadConfigs()
     loadDocuments()
@@ -457,5 +494,25 @@
     display: flex;
     align-items: center;
     gap: 10px;
+  }
+  
+  .document-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: monospace;
+    padding: 10px;
+    background-color: #f5f7fa;
+    border-radius: 4px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  
+  .reference-item {
+    margin: 5px 0;
+  }
+  
+  .reference-item .el-button {
+    padding: 0;
+    font-size: inherit;
   }
   </style>
