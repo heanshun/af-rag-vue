@@ -38,6 +38,43 @@
                 </template>
               </el-dropdown>
             </div>
+
+            <!-- 新增文档管理部分 -->
+            <div class="right-section">
+              <el-dropdown>
+                <span class="model-selector">
+                  <span>文档管理</span>
+                  <el-icon class="el-icon--right"><arrow-down /></el-icon>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <div v-for="doc in documents" :key="doc" class="config-item">
+                      <el-dropdown-item>
+                        {{ doc }}
+                      </el-dropdown-item>
+                      <el-button
+                        type="danger"
+                        size="small"
+                        class="delete-btn"
+                        @click.stop="handleDeleteDocument(doc)"
+                      >
+                        删除
+                      </el-button>
+                    </div>
+                    <el-dropdown-item divided>
+                      <el-upload
+                        class="upload-in-dropdown"
+                        :http-request="handleUploadDocument"
+                        :show-file-list="false"
+                        accept=".txt,.pdf,.doc,.docx"
+                      >
+                        <span>上传新文档</span>
+                      </el-upload>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </div>
         </template>
   
@@ -54,8 +91,25 @@
           </el-input>
         </div>
   
-        <div v-if="answer" class="answer">
-          <pre>{{ answer }}</pre>
+        <div v-if="answer" class="answer-container">
+          <div class="answer-section">
+            <div class="section-title">回答：</div>
+            <div class="section-content">{{ answer.answer }}</div>
+          </div>
+          
+          <div class="answer-section">
+            <div class="section-title">理由：</div>
+            <div class="section-content">{{ answer.rationale }}</div>
+          </div>
+          
+          <div class="answer-section">
+            <div class="section-title">参考来源：</div>
+            <div class="section-content">
+              <div v-for="(ref, index) in answer.references" :key="index">
+                {{ ref }}
+              </div>
+            </div>
+          </div>
         </div>
       </el-card>
     </div>
@@ -68,10 +122,15 @@
   import { api } from '../api'
   
   const question = ref('')
-  const answer = ref('')
+  const answer = ref<{
+    answer: string;
+    rationale: string;
+    references: string[];
+  } | null>(null)
   const loading = ref(false)
   const configs = ref<{ filename: string }[]>([])
   const currentConfig = ref('')
+  const documents = ref<string[]>([])
   
   // 加载配置列表
   const loadConfigs = async () => {
@@ -194,8 +253,93 @@
     }
   }
   
+  // 加载文档列表
+  const loadDocuments = async () => {
+    try {
+      const response = await api.getDocuments()
+      if (response.data.success) {
+        documents.value = response.data.data
+      }
+    } catch (error) {
+      ElMessage.error('加载文档列表失败')
+    }
+  }
+  
+  // 处理文档上传
+  const handleUploadDocument = async (options: any) => {
+    const file = options.file
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('force_override', 'false')
+
+    try {
+      const response = await api.uploadDocument(formData)
+      if (response.data.success) {
+        ElMessage.success('文档上传成功')
+        loadDocuments()
+      } else if (response.data.needConfirm) {
+        try {
+          await ElMessageBox.confirm(
+            `文档 "${response.data.name}" 已存在，是否要替换？`,
+            '确认替换',
+            {
+              confirmButtonText: '替换',
+              cancelButtonText: '取消',
+              type: 'warning',
+            }
+          )
+          const formDataWithOverride = new FormData()
+          formDataWithOverride.append('file', file)
+          formDataWithOverride.append('force_override', 'true')
+          
+          const replaceResponse = await api.uploadDocument(formDataWithOverride)
+          if (replaceResponse.data.success) {
+            ElMessage.success('文档替换成功')
+            loadDocuments()
+          } else {
+            ElMessage.error(replaceResponse.data.message)
+          }
+        } catch {
+          return
+        }
+      } else {
+        ElMessage.error(response.data.message)
+      }
+    } catch (error) {
+      ElMessage.error('文档上传失败')
+    }
+  }
+  
+  // 处理文档删除
+  const handleDeleteDocument = async (name: string) => {
+    try {
+      await ElMessageBox.confirm(
+        `确定要删除文档 "${name}" 吗？`,
+        '确认删除',
+        {
+          confirmButtonText: '删除',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+      )
+
+      const response = await api.deleteDocument(name)
+      if (response.data.success) {
+        ElMessage.success(response.data.message)
+        loadDocuments()
+      } else {
+        ElMessage.error(response.data.message)
+      }
+    } catch (error) {
+      if (error !== 'cancel') {
+        ElMessage.error('删除失败')
+      }
+    }
+  }
+  
   onMounted(() => {
     loadConfigs()
+    loadDocuments()
   })
   </script>
   
@@ -213,6 +357,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    width: 100%;
   }
   
   .left-section {
@@ -238,16 +383,34 @@
     margin-bottom: 20px;
   }
   
-  .answer {
+  .answer-container {
     padding: 15px;
     background-color: #f5f7fa;
     border-radius: 4px;
   }
   
-  .answer pre {
+  .answer-section {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e4e7ed;
+  }
+  
+  .answer-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+  
+  .section-title {
+    font-weight: bold;
+    color: #409EFF;
+    margin-bottom: 8px;
+  }
+  
+  .section-content {
     white-space: pre-wrap;
     word-wrap: break-word;
-    margin: 0;
+    line-height: 1.5;
   }
   
   .upload-in-dropdown {
@@ -287,5 +450,12 @@
   
   :deep(.el-dropdown-menu__item:not(.is-disabled):hover) {
     background-color: transparent;
+  }
+  
+  /* 添加右侧部分样式 */
+  .right-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
   </style>

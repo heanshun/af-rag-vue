@@ -36,5 +36,22 @@ export const api = {
   // 提问
   ask(question: string) {
     return axios.post(`${BASE_URL}/qa/ask`, { question })
+  },
+
+  // 获取文档列表
+  getDocuments() {
+    return axios.get(`${BASE_URL}/documents`)
+  },
+    
+  // 上传文档
+  uploadDocument(formData: FormData) {
+    return axios.post(`${BASE_URL}/documents/upload`, formData)
+  },
+    
+  // 删除文档
+  deleteDocument(name: string) {
+    return axios.delete(`${BASE_URL}/documents/delete`, {
+    data: { name }
+    })
   }
 }
