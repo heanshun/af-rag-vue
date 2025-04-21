@@ -70,5 +70,20 @@ export const api = {
   // 清空聊天历史
   clearHistory(sessionId: string) {
     return axios.post(`${BASE_URL}/qa/clear`, { session_id: sessionId })
+  },
+
+  // 获取归档对话列表
+  getChatArchives() {
+    return axios.get(`${BASE_URL}/qa/archives`)
+  },
+
+  // 恢复归档对话
+  restoreArchive(archiveId: string) {
+    return axios.get(`${BASE_URL}/qa/archives/${archiveId}`)
+  },
+
+  // 添加删除归档对话的方法
+  deleteArchive(archiveId: string) {
+    return axios.delete(`${BASE_URL}/qa/archives/${archiveId}`)
   }
 }
