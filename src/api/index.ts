@@ -57,7 +57,9 @@ export const api = {
 
   // 获取文档内容
   getDocumentContent(docName: string) {
-    return axios.get(`${BASE_URL}/documents/content/${encodeURIComponent(docName)}`)
+    return axios.get(`${BASE_URL}/documents/content/${encodeURIComponent(docName)}`, {
+      responseType: 'text'
+    })
   },
 
   // 获取聊天历史

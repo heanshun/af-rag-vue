@@ -412,17 +412,14 @@
     }
   }
   
-  // 添加查看文档的方法
+  // 修改查看文档的方法
   const handleViewDocument = async (docName: string) => {
     try {
       const response = await api.getDocumentContent(docName)
-      if (response.data.success) {
-        documentContent.value = response.data.data.content
-        currentDocument.value = docName
-        showDocumentDialog.value = true
-      } else {
-        ElMessage.error(response.data.message)
-      }
+      // 直接使用返回的文本内容
+      documentContent.value = response.data || '文档内容为空'
+      currentDocument.value = docName
+      showDocumentDialog.value = true
     } catch (error) {
       ElMessage.error('获取文档内容失败')
     }
