@@ -78,43 +78,56 @@
           </div>
         </template>
   
+        <div class="chat-container">
+          <div v-for="(message, index) in chatHistory" 
+               :key="index" 
+               class="message"
+               :class="message.role">
+            <div class="message-content">
+              <template v-if="message.role === 'assistant'">
+                <div class="answer-section">
+                  <div class="section-title">回答：</div>
+                  <div class="section-content">{{ message.content }}</div>
+                </div>
+                
+                <div class="answer-section">
+                  <div class="section-title">理由：</div>
+                  <div class="section-content">{{ message.rationale }}</div>
+                </div>
+                
+                <div class="answer-section">
+                  <div class="section-title">参考来源：</div>
+                  <div class="section-content">
+                    <div v-for="(ref, refIndex) in message.references" 
+                         :key="refIndex" 
+                         class="reference-item">
+                      <el-button link type="primary" @click="handleViewDocument(ref)">
+                        {{ ref }}
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <div class="question-content">{{ message.content }}</div>
+              </template>
+            </div>
+          </div>
+        </div>
+  
         <div class="question-input">
           <el-input
             v-model="question"
+            type="textarea"
+            :rows="3"
             placeholder="请输入您的问题"
             :disabled="loading"
-            @keyup.enter="handleAsk"
+            @keyup.enter.ctrl="handleAsk"
           >
-            <template #append>
-              <el-button :loading="loading" @click="handleAsk">提问</el-button>
-            </template>
           </el-input>
-        </div>
-  
-        <div v-if="answer" class="answer-container">
-          <div class="answer-section">
-            <div class="section-title">回答：</div>
-            <div class="section-content">{{ answer.answer }}</div>
-          </div>
-          
-          <div class="answer-section">
-            <div class="section-title">理由：</div>
-            <div class="section-content">{{ answer.rationale }}</div>
-          </div>
-          
-          <div class="answer-section">
-            <div class="section-title">参考来源：</div>
-            <div class="section-content">
-              <div v-for="(ref, index) in answer.references" :key="index" class="reference-item">
-                <el-button 
-                  link 
-                  type="primary" 
-                  @click="handleViewDocument(ref)"
-                >
-                  {{ ref }}
-                </el-button>
-              </div>
-            </div>
+          <div class="input-actions">
+            <el-button type="primary" :loading="loading" @click="handleAsk">发送</el-button>
+            <el-button @click="handleClearHistory">清空对话</el-button>
           </div>
         </div>
       </el-card>
@@ -138,11 +151,6 @@
   import { api } from '../api'
   
   const question = ref('')
-  const answer = ref<{
-    answer: string;
-    rationale: string;
-    references: string[];
-  } | null>(null)
   const loading = ref(false)
   const configs = ref<{ filename: string }[]>([])
   const currentConfig = ref('')
@@ -152,6 +160,17 @@
   const showDocumentDialog = ref(false)
   const documentContent = ref('')
   const currentDocument = ref('')
+  
+  // 新增聊天历史相关变量
+  const chatHistory = ref<Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    rationale?: string;
+    references?: string[];
+  }>>([])
+  
+  // 生成随机会话ID
+  const sessionId = ref(Math.random().toString(36).substring(7))
   
   // 加载配置列表
   const loadConfigs = async () => {
@@ -231,16 +250,51 @@
   
     loading.value = true
     try {
-      const response = await api.ask(question.value)
+      // 先添加用户问题到历史记录
+      chatHistory.value.push({
+        role: 'user',
+        content: question.value
+      })
+
+      const response = await api.ask({
+        question: question.value,
+        session_id: sessionId.value
+      })
+      
       if (response.data.success) {
-        answer.value = response.data.data
+        const data = response.data.data
+        // 添加助手回答到历史记录
+        chatHistory.value.push({
+          role: 'assistant',
+          content: data.answer,
+          rationale: data.rationale,
+          references: data.references || []
+        })
       } else {
         ElMessage.error(response.data.message)
+        // 如果请求失败，移除刚才添加的用户问题
+        chatHistory.value.pop()
       }
     } catch (error) {
       ElMessage.error('请求失败')
+      // 如果请求失败，移除刚才添加的用户问题
+      chatHistory.value.pop()
     } finally {
       loading.value = false
+      question.value = ''
+    }
+  }
+  
+  // 添加清空历史记录方法
+  const handleClearHistory = async () => {
+    try {
+      const response = await api.clearHistory(sessionId.value)
+      if (response.data.success) {
+        chatHistory.value = []
+        ElMessage.success('对话历史已清空')
+      }
+    } catch (error) {
+      ElMessage.error('清空历史记录失败')
     }
   }
   
@@ -374,9 +428,18 @@
     }
   }
   
-  onMounted(() => {
+  onMounted(async () => {
     loadConfigs()
     loadDocuments()
+    
+    try {
+      const response = await api.getChatHistory(sessionId.value)
+      if (response.data.success) {
+        chatHistory.value = response.data.data
+      }
+    } catch (error) {
+      console.error('获取对话历史失败:', error)
+    }
   })
   </script>
   
@@ -416,38 +479,69 @@
     background-color: #f5f7fa;
   }
   
-  .question-input {
+  .chat-container {
     margin-bottom: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 10px;
   }
   
-  .answer-container {
-    padding: 15px;
+  .message {
+    margin-bottom: 20px;
+    padding: 10px;
+    border-radius: 8px;
+  }
+  
+  .message.user {
     background-color: #f5f7fa;
-    border-radius: 4px;
+    margin-left: 20%;
   }
   
-  .answer-section {
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #e4e7ed;
+  .message.assistant {
+    background-color: #ecf5ff;
+    margin-right: 20%;
   }
   
-  .answer-section:last-child {
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
-  }
-  
-  .section-title {
-    font-weight: bold;
-    color: #409EFF;
-    margin-bottom: 8px;
-  }
-  
-  .section-content {
+  .message-content {
+    line-height: 1.5;
     white-space: pre-wrap;
     word-wrap: break-word;
-    line-height: 1.5;
+  }
+  
+  .references {
+    margin-top: 10px;
+    font-size: 0.9em;
+    border-top: 1px solid #dcdfe6;
+    padding-top: 5px;
+  }
+  
+  .reference-title {
+    color: #409EFF;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+  
+  .reference-item {
+    margin: 5px 0;
+  }
+  
+  .reference-item .el-button {
+    padding: 0;
+    font-size: inherit;
+  }
+  
+  .input-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  
+  .question-input {
+    position: sticky;
+    bottom: 0;
+    background-color: white;
+    padding: 10px 0;
   }
   
   .upload-in-dropdown {
@@ -507,12 +601,31 @@
     overflow-y: auto;
   }
   
-  .reference-item {
-    margin: 5px 0;
+  .answer-section {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e4e7ed;
   }
   
-  .reference-item .el-button {
-    padding: 0;
-    font-size: inherit;
+  .answer-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+  
+  .section-title {
+    font-weight: bold;
+    color: #409EFF;
+    margin-bottom: 8px;
+  }
+  
+  .section-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.5;
+  }
+  
+  .question-content {
+    padding: 8px 0;
   }
   </style>

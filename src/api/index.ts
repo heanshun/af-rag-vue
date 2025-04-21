@@ -34,8 +34,8 @@ export const api = {
   },
 
   // 提问
-  ask(question: string) {
-    return axios.post(`${BASE_URL}/qa/ask`, { question })
+  ask(data: { question: string; session_id: string }) {
+    return axios.post(`${BASE_URL}/qa/chat`, data)
   },
 
   // 获取文档列表
@@ -51,12 +51,22 @@ export const api = {
   // 删除文档
   deleteDocument(name: string) {
     return axios.delete(`${BASE_URL}/documents/delete`, {
-    data: { name }
+      data: { name }
     })
   },
 
   // 获取文档内容
   getDocumentContent(docName: string) {
     return axios.get(`${BASE_URL}/documents/content/${encodeURIComponent(docName)}`)
+  },
+
+  // 获取聊天历史
+  getChatHistory(sessionId: string) {
+    return axios.get(`${BASE_URL}/qa/history?session_id=${sessionId}`)
+  },
+  
+  // 清空聊天历史
+  clearHistory(sessionId: string) {
+    return axios.post(`${BASE_URL}/qa/clear`, { session_id: sessionId })
   }
 }
