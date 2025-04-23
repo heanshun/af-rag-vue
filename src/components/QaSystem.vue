@@ -165,7 +165,6 @@
             </el-input>
             <div class="input-actions">
               <el-button type="primary" :loading="loading" @click="handleAsk">发送</el-button>
-              <el-button @click="handleArchive">归档</el-button>
             </div>
           </div>
         </el-card>
@@ -309,6 +308,8 @@
         const data = response.data.data
         // 直接使用后端返回的历史记录
         chatHistory.value = data.history
+        // 在提问成功后刷新历史对话列表
+        loadArchives()
       } else {
         ElMessage.error(response.data.message)
       }
@@ -434,21 +435,6 @@
     chatHistory.value = []
     currentArchiveId.value = ''
     sessionId.value = Math.random().toString(36).substring(7)
-  }
-  
-  // 修改为归档方法
-  const handleArchive = async () => {
-    try {
-      const response = await api.clearHistory(sessionId.value)
-      if (response.data.success) {
-        chatHistory.value = []
-        ElMessage.success('对话已归档')
-        // 重新加载归档列表
-        loadArchives()
-      }
-    } catch (error) {
-      ElMessage.error('归档失败')
-    }
   }
   
   // 修改恢复归档对话的方法

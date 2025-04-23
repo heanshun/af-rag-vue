@@ -67,11 +67,6 @@ export const api = {
     return axios.get(`${BASE_URL}/qa/history?session_id=${sessionId}`)
   },
   
-  // 清空聊天历史
-  clearHistory(sessionId: string) {
-    return axios.post(`${BASE_URL}/qa/clear`, { session_id: sessionId })
-  },
-
   // 获取归档对话列表
   getChatArchives() {
     return axios.get(`${BASE_URL}/qa/archives`)
