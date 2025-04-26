@@ -1,5 +1,5 @@
 <template>
-    <div class="qa-system">
+    <div class="qa-system" :class="{ 'loading': loading || uploading }">
       <!-- 左侧历史记录面板 -->
       <div class="archives-panel">
         <div class="archives-header">
@@ -69,6 +69,7 @@
                           :http-request="handleUpload"
                           :show-file-list="false"
                           accept=".yml"
+                          :disabled="uploading"
                         >
                           <span>上传新配置</span>
                         </el-upload>
@@ -105,8 +106,14 @@
                           :http-request="handleUploadDocument"
                           :show-file-list="false"
                           accept=".txt,.pdf,.doc,.docx"
+                          :disabled="uploading"
                         >
-                          <span>上传新文档</span>
+                          <template #trigger>
+                            <span class="upload-button">
+                              <span>上传新文档</span>
+                              <el-icon v-if="uploading" class="uploading-icon"><loading /></el-icon>
+                            </span>
+                          </template>
                         </el-upload>
                       </el-dropdown-item>
                     </el-dropdown-menu>
@@ -180,12 +187,23 @@
     >
       <pre class="document-content">{{ documentContent }}</pre>
     </el-dialog>
+
+    <!-- 添加上传进度遮罩层 -->
+    <div v-if="uploading" class="uploading-overlay">
+      <div class="uploading-content">
+        <el-icon class="uploading-icon-large"><loading /></el-icon>
+        <div class="uploading-text">正在上传文档...</div>
+        <div class="uploading-progress" v-if="uploadProgress > 0">
+          {{ uploadProgress }}%
+        </div>
+      </div>
+    </div>
   </template>
   
   <script setup lang="ts">
   import { ref, onMounted } from 'vue'
   import { ElMessage, ElMessageBox } from 'element-plus'
-  import { ArrowDown } from '@element-plus/icons-vue'
+  import { ArrowDown, Loading } from '@element-plus/icons-vue'
   import { api } from '../api'
   
   const question = ref('')
@@ -221,6 +239,12 @@
   // 添加当前选中的归档ID
   const currentArchiveId = ref('')
   
+  // 添加上传状态变量
+  const uploading = ref(false)
+  
+  // 添加上传进度变量
+  const uploadProgress = ref(0)
+  
   // 加载配置列表
   const loadConfigs = async () => {
     try {
@@ -241,6 +265,7 @@
       return
     }
   
+    uploading.value = true
     try {
       const checkResponse = await api.checkConfig(file.name)
       if (checkResponse.data.exists) {
@@ -255,6 +280,7 @@
             }
           )
         } catch {
+          uploading.value = false
           return
         }
       }
@@ -268,6 +294,8 @@
       }
     } catch (error) {
       ElMessage.error('上传失败')
+    } finally {
+      uploading.value = false
     }
   }
   
@@ -333,15 +361,28 @@
     }
   }
   
-  // 处理文档上传
+  // 修改文档上传处理函数
   const handleUploadDocument = async (options: any) => {
     const file = options.file
     const formData = new FormData()
     formData.append('file', file)
     formData.append('force_override', 'false')
 
+    uploading.value = true
+    uploadProgress.value = 0
+
+    // 模拟上传进度
+    const progressInterval = setInterval(() => {
+      if (uploadProgress.value < 90) {
+        uploadProgress.value += 10
+      }
+    }, 500)
+
     try {
       const response = await api.uploadDocument(formData)
+      clearInterval(progressInterval)
+      uploadProgress.value = 100
+
       if (response.data.success) {
         ElMessage.success('文档上传成功')
         loadDocuments()
@@ -368,6 +409,8 @@
             ElMessage.error(replaceResponse.data.message)
           }
         } catch {
+          uploading.value = false
+          uploadProgress.value = 0
           return
         }
       } else {
@@ -375,6 +418,9 @@
       }
     } catch (error) {
       ElMessage.error('文档上传失败')
+    } finally {
+      uploading.value = false
+      uploadProgress.value = 0
     }
   }
   
@@ -818,5 +864,92 @@
   .archive-time {
     font-size: 12px;
     color: #909399;
+  }
+
+  /* 添加加载状态样式 */
+  .qa-system.loading {
+    pointer-events: none;
+    opacity: 0.7;
+  }
+
+  .qa-system.loading::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+  }
+
+  /* 添加上传按钮禁用状态样式 */
+  .upload-in-dropdown :deep(.el-upload) {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .upload-in-dropdown :deep(.el-upload:hover) {
+    background-color: transparent;
+  }
+
+  /* 添加上传按钮样式 */
+  .upload-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .uploading-icon {
+    animation: rotating 2s linear infinite;
+  }
+
+  .uploading-icon-large {
+    font-size: 40px;
+    color: #409EFF;
+    animation: rotating 2s linear infinite;
+  }
+
+  /* 添加上传遮罩层样式 */
+  .uploading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+  }
+
+  .uploading-content {
+    background-color: white;
+    padding: 30px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  }
+
+  .uploading-text {
+    margin-top: 16px;
+    font-size: 16px;
+    color: #606266;
+  }
+
+  .uploading-progress {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #409EFF;
+  }
+
+  @keyframes rotating {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
   </style>
