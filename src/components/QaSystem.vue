@@ -188,14 +188,11 @@
       <pre class="document-content">{{ documentContent }}</pre>
     </el-dialog>
 
-    <!-- 添加上传进度遮罩层 -->
+    <!-- 修改上传进度遮罩层，移除进度显示 -->
     <div v-if="uploading" class="uploading-overlay">
       <div class="uploading-content">
         <el-icon class="uploading-icon-large"><loading /></el-icon>
         <div class="uploading-text">正在上传文档...</div>
-        <div class="uploading-progress" v-if="uploadProgress > 0">
-          {{ uploadProgress }}%
-        </div>
       </div>
     </div>
   </template>
@@ -241,9 +238,6 @@
   
   // 添加上传状态变量
   const uploading = ref(false)
-  
-  // 添加上传进度变量
-  const uploadProgress = ref(0)
   
   // 加载配置列表
   const loadConfigs = async () => {
@@ -361,7 +355,7 @@
     }
   }
   
-  // 修改文档上传处理函数
+  // 修改文档上传处理函数，移除进度相关代码
   const handleUploadDocument = async (options: any) => {
     const file = options.file
     const formData = new FormData()
@@ -369,20 +363,9 @@
     formData.append('force_override', 'false')
 
     uploading.value = true
-    uploadProgress.value = 0
-
-    // 模拟上传进度
-    const progressInterval = setInterval(() => {
-      if (uploadProgress.value < 90) {
-        uploadProgress.value += 10
-      }
-    }, 500)
 
     try {
       const response = await api.uploadDocument(formData)
-      clearInterval(progressInterval)
-      uploadProgress.value = 100
-
       if (response.data.success) {
         ElMessage.success('文档上传成功')
         loadDocuments()
@@ -410,7 +393,6 @@
           }
         } catch {
           uploading.value = false
-          uploadProgress.value = 0
           return
         }
       } else {
@@ -420,7 +402,6 @@
       ElMessage.error('文档上传失败')
     } finally {
       uploading.value = false
-      uploadProgress.value = 0
     }
   }
   
@@ -904,13 +885,7 @@
     animation: rotating 2s linear infinite;
   }
 
-  .uploading-icon-large {
-    font-size: 40px;
-    color: #409EFF;
-    animation: rotating 2s linear infinite;
-  }
-
-  /* 添加上传遮罩层样式 */
+  /* 修改上传进度遮罩层，移除进度显示 */
   .uploading-overlay {
     position: fixed;
     top: 0;
@@ -938,10 +913,10 @@
     color: #606266;
   }
 
-  .uploading-progress {
-    margin-top: 8px;
-    font-size: 14px;
+  .uploading-icon-large {
+    font-size: 40px;
     color: #409EFF;
+    animation: rotating 2s linear infinite;
   }
 
   @keyframes rotating {
